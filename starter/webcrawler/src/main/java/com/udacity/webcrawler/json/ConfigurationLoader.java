@@ -1,7 +1,7 @@
 package com.udacity.webcrawler.json;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -43,57 +43,24 @@ public final class ConfigurationLoader {
    * @return a crawler configuration
    */
   public static CrawlerConfiguration read(Reader reader) {
-    Objects.requireNonNull(reader);
+    Objects.requireNonNull(reader, "Reader cannot be null");
 
-    Gson gson = new Gson();
-    BuilderData data = gson.fromJson(reader, BuilderData.class);
+    ObjectMapper mapper = new ObjectMapper();
 
-    if (data == null) {
-      throw new JsonParseException("Configuration JSON is empty or invalid");
+    // Prevent automatic closing of the reader
+    mapper.configure(JsonParser.Feature.AUTO_CLOSE_SOURCE, false);
+
+    try {
+      // Deserialize JSON into the Builder type, then build the config
+      CrawlerConfiguration.Builder builder =
+          mapper.readValue(reader, CrawlerConfiguration.Builder.class);
+
+      return builder.build();
+
+    } catch (IOException e) {
+      throw new IllegalArgumentException(
+          "Invalid crawler configuration JSON", e);
     }
-
-    CrawlerConfiguration.Builder builder = new CrawlerConfiguration.Builder();
-
-    if (data.startPages != null) {
-      builder.addStartPages(data.startPages.toArray(new String[0]));
-    }
-
-    if (data.ignoredUrls != null) {
-      builder.addIgnoredUrls(data.ignoredUrls.toArray(new String[0]));
-    }
-
-    if (data.ignoredWords != null) {
-      builder.addIgnoredWords(data.ignoredWords.toArray(new String[0]));
-    }
-
-    builder.setParallelism(data.parallelism);
-    builder.setImplementationOverride(
-        data.implementationOverride == null ? "" : data.implementationOverride);
-    builder.setMaxDepth(data.maxDepth);
-    builder.setTimeoutSeconds(data.timeoutSeconds);
-    builder.setPopularWordCount(data.popularWordCount);
-    builder.setProfileOutputPath(
-        data.profileOutputPath == null ? "" : data.profileOutputPath);
-    builder.setResultPath(
-        data.resultPath == null ? "" : data.resultPath);
-
-    return builder.build();
-  }
-
-  /**
-   * Helper class used by Gson to deserialize JSON.
-   */
-  private static class BuilderData {
-    java.util.List<String> startPages;
-    java.util.List<String> ignoredUrls;
-    java.util.List<String> ignoredWords;
-    int parallelism;
-    String implementationOverride;
-    int maxDepth;
-    int timeoutSeconds;
-    int popularWordCount;
-    String profileOutputPath;
-    String resultPath;
   }
 }
 
