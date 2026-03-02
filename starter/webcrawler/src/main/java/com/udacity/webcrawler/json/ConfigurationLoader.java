@@ -1,11 +1,16 @@
 package com.udacity.webcrawler.json;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
+
+import java.io.IOException;
 import java.io.Reader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * A static utility class that loads a JSON configuration file.
+ * A utility class that loads a JSON configuration file.
  */
 public final class ConfigurationLoader {
 
@@ -19,14 +24,16 @@ public final class ConfigurationLoader {
   }
 
   /**
-   * Loads configuration from this {@link ConfigurationLoader}'s path
+   * Loads configuration from this {@link ConfigurationLoader}'s path.
    *
    * @return the loaded {@link CrawlerConfiguration}.
    */
   public CrawlerConfiguration load() {
-    // TODO: Fill in this method.
-
-    return new CrawlerConfiguration.Builder().build();
+    try (Reader reader = Files.newBufferedReader(path)) {
+      return read(reader);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to load configuration from " + path, e);
+    }
   }
 
   /**
@@ -36,10 +43,57 @@ public final class ConfigurationLoader {
    * @return a crawler configuration
    */
   public static CrawlerConfiguration read(Reader reader) {
-    // This is here to get rid of the unused variable warning.
     Objects.requireNonNull(reader);
-    // TODO: Fill in this method
 
-    return new CrawlerConfiguration.Builder().build();
+    Gson gson = new Gson();
+    BuilderData data = gson.fromJson(reader, BuilderData.class);
+
+    if (data == null) {
+      throw new JsonParseException("Configuration JSON is empty or invalid");
+    }
+
+    CrawlerConfiguration.Builder builder = new CrawlerConfiguration.Builder();
+
+    if (data.startPages != null) {
+      builder.addStartPages(data.startPages.toArray(new String[0]));
+    }
+
+    if (data.ignoredUrls != null) {
+      builder.addIgnoredUrls(data.ignoredUrls.toArray(new String[0]));
+    }
+
+    if (data.ignoredWords != null) {
+      builder.addIgnoredWords(data.ignoredWords.toArray(new String[0]));
+    }
+
+    builder.setParallelism(data.parallelism);
+    builder.setImplementationOverride(
+        data.implementationOverride == null ? "" : data.implementationOverride);
+    builder.setMaxDepth(data.maxDepth);
+    builder.setTimeoutSeconds(data.timeoutSeconds);
+    builder.setPopularWordCount(data.popularWordCount);
+    builder.setProfileOutputPath(
+        data.profileOutputPath == null ? "" : data.profileOutputPath);
+    builder.setResultPath(
+        data.resultPath == null ? "" : data.resultPath);
+
+    return builder.build();
+  }
+
+  /**
+   * Helper class used by Gson to deserialize JSON.
+   */
+  private static class BuilderData {
+    java.util.List<String> startPages;
+    java.util.List<String> ignoredUrls;
+    java.util.List<String> ignoredWords;
+    int parallelism;
+    String implementationOverride;
+    int maxDepth;
+    int timeoutSeconds;
+    int popularWordCount;
+    String profileOutputPath;
+    String resultPath;
   }
 }
+

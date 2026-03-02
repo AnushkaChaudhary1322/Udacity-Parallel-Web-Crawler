@@ -2,8 +2,10 @@ package com.udacity.webcrawler;
 
 import com.udacity.webcrawler.json.CrawlResult;
 import com.udacity.webcrawler.parser.PageParserFactory;
+import com.udacity.webcrawler.parser.PageParser;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +18,10 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * A concrete implementation of {@link WebCrawler} that runs multiple threads on a
+ * {@link ForkJoinPool} to fetch and process multiple web pages in parallel.
+ */
 final class ParallelWebCrawler implements WebCrawler {
 
   private final Clock clock;
@@ -27,7 +33,6 @@ final class ParallelWebCrawler implements WebCrawler {
   private final int maxDepth;
 
   private final List<Pattern> ignoredUrls;
-  private final List<String> ignoredWords;
 
   @Inject
   ParallelWebCrawler(
@@ -37,8 +42,7 @@ final class ParallelWebCrawler implements WebCrawler {
       @TargetParallelism int threadCount,
       PageParserFactory parserFactory,
       @MaxDepth int maxDepth,
-      @IgnoredUrls List<Pattern> ignoredUrls,
-      List<String> ignoredWords) {
+      @IgnoredUrls List<Pattern> ignoredUrls) {
 
     this.clock = clock;
     this.timeout = timeout;
@@ -50,7 +54,6 @@ final class ParallelWebCrawler implements WebCrawler {
         Math.min(threadCount, getMaxParallelism()));
 
     this.ignoredUrls = ignoredUrls;
-    this.ignoredWords = ignoredWords;
   }
 
   @Override
@@ -58,8 +61,8 @@ final class ParallelWebCrawler implements WebCrawler {
 
     Instant deadline = clock.instant().plus(timeout);
 
+    ConcurrentMap<String, Integer> counts = new ConcurrentHashMap<>();
     Set<String> visitedUrls = new ConcurrentSkipListSet<>();
-    Map<String, Integer> counts = new LinkedHashMap<>();
 
     for (String url : startingUrls) {
       pool.invoke(new CrawlTask(
@@ -75,22 +78,8 @@ final class ParallelWebCrawler implements WebCrawler {
           ignoredWords));
     }
 
-    Map<String, Integer> sorted =
-        counts.entrySet()
-            .stream()
-            .sorted(
-                Map.Entry.<String, Integer>comparingByValue()
-                    .reversed()
-                    .thenComparing(Map.Entry.comparingByKey()))
-            .limit(popularWordCount)
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                Map.Entry::getValue,
-                (a, b) -> a,
-                LinkedHashMap::new));
-
     return new CrawlResult.Builder()
-        .setWordCounts(sorted)
+        .setWordCounts(WordCounts.sort(counts, popularWordCount))
         .setUrlsVisited(visitedUrls.size())
         .build();
   }
