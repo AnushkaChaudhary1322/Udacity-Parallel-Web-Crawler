@@ -1,8 +1,12 @@
 package com.udacity.webcrawler.profiler;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.Objects;
 
 /**
@@ -14,8 +18,11 @@ final class ProfilingMethodInterceptor implements InvocationHandler {
   private final Clock clock;
 
   // TODO: You will need to add more instance fields and constructor arguments to this class.
-  ProfilingMethodInterceptor(Clock clock) {
+  ProfilingMethodInterceptor(Clock clock, Object delegate, ProfilingState state, ZoneDataTime startTime) {
     this.clock = Objects.requireNonNull(clock);
+    this.delegate = delegate;
+    this.state = state;
+    this.startTime = startTime;
   }
 
   @Override
@@ -25,6 +32,22 @@ final class ProfilingMethodInterceptor implements InvocationHandler {
     //       invoke the method using the object that is being profiled. Finally, for profiled
     //       methods, the interceptor should record how long the method call took, using the
     //       ProfilingState methods.
-    return null;
+    Object invoked;
+    Instant start = null;
+    boolean profiled = method.getAnnotation(Profiled.class) != null;
+    if (profiled) {
+      start = clock.instant();
+    }
+    try {
+      invoked = method.invoke(delegate, args);
+    } catch (InvocationTargetException ex) {
+      throw ex.getTargetException();
+    } finally {
+      if (profiled) {
+        Duration duration = Duration.between(start, clock.instant());
+        state.record(delegate.getClass(), method, duration);
+      }
+    }
+    return invoked;
   }
 }
