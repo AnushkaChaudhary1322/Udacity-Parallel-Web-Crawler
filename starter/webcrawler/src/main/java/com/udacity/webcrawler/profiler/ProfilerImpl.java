@@ -4,11 +4,15 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.Objects;
 
 import static java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME;
+
+import java.lang.reflect.Proxy;
+
 
 /**
  * Concrete implementation of the {@link Profiler}.
