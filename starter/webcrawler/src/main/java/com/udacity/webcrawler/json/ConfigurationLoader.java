@@ -46,12 +46,9 @@ public final class ConfigurationLoader {
     Objects.requireNonNull(reader, "Reader cannot be null");
 
     ObjectMapper mapper = new ObjectMapper();
-
-    // Prevent automatic closing of the reader
     mapper.configure(JsonParser.Feature.AUTO_CLOSE_SOURCE, false);
 
     try {
-      // Deserialize JSON into the Builder type, then build the config
       CrawlerConfiguration.Builder builder =
           mapper.readValue(reader, CrawlerConfiguration.Builder.class);
 
