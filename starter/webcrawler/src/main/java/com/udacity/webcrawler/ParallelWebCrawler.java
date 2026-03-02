@@ -1,16 +1,20 @@
 package com.udacity.webcrawler;
 
+
 import com.udacity.webcrawler.json.CrawlResult;
 import com.udacity.webcrawler.parser.PageParser;
 import com.udacity.webcrawler.parser.PageParserFactory;
 
-import javax.inject.Inject;
-import javax.inject.Provider;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+
 import java.util.*;
 import java.util.concurrent.*;
+
+import javax.inject.Inject;
+import javax.inject.Provider;
+
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -23,9 +27,9 @@ final class ParallelWebCrawler implements WebCrawler {
   private final Duration timeout;
   private final int popularWordCount;
   private final ForkJoinPool pool;
-  private final List<Pattern> ignoredUrls;
   private final int maxDepth;
   private final PageParserFactory parserFactory;
+  private final List<Pattern> ignoredUrls;
 
   @Inject
   ParallelWebCrawler(
@@ -33,16 +37,16 @@ final class ParallelWebCrawler implements WebCrawler {
       @Timeout Duration timeout,
       @PopularWordCount int popularWordCount,
       @TargetParallelism int threadCount,
-      @IgnoredUrls List<Pattern> ignoredUrls,
       @MaxDepth int maxDepth,
-      PageParserFactory parserFactory) {
-    this.clock = clock;
-    this.timeout = timeout;
-    this.popularWordCount = popularWordCount;
-    this.pool = new ForkJoinPool(Math.min(threadCount, getMaxParallelism()));
-    this.ignoredUrls = ignoredUrls;
-    this.maxDepth = maxDepth;
-    this.parserFactory = parserFactory;
+      PageParserFactory parserFactory,
+      @IgnoredUrls List<Pattern> ignoredUrls) {
+        this.clock = clock;
+        this.timeout = timeout;
+        this.popularWordCount = popularWordCount;
+        this.pool = new ForkJoinPool(Math.min(threadCount, getMaxParallelism()));
+        this.ignoredUrls = ignoredUrls;
+        this.maxDepth = maxDepth;
+        this.parserFactory = parserFactory;
   }
 
   @Override
@@ -84,9 +88,11 @@ final class ParallelWebCrawler implements WebCrawler {
 
     @Override
     protected Boolean compute() {
+      // Stop if max depth reached or timeout happens
       if (maxDepth == 0 || clock.instant().isAfter(deadline)) {
         return false;
       }
+      // Skip URL if it matches any ignored pattern
       for (Pattern pattern : ignoredUrls) {
         if (pattern.matcher(url).matches()) {
           return false;
@@ -98,9 +104,11 @@ final class ParallelWebCrawler implements WebCrawler {
       visitedUrls.add(url);
       PageParser.Result result = parserFactory.get(url).parse();
 
+      // Merge word count
       for (ConcurrentMap.Entry<String, Integer> e : result.getWordCounts().entrySet()) {
         counts.compute(e.getKey(), (k, v) -> (v == null) ? e.getValue() : e.getValue() + v);
       }
+
       List<InternalCrawler> subtasks = new ArrayList<>();
       for (String link : result.getLinks()) {
         subtasks.add(new InternalCrawler(link, deadline, maxDepth -1, counts, visitedUrls));
